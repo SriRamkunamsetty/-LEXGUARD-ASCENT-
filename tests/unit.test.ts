@@ -258,6 +258,17 @@ describe("Document Cache Service", () => {
     const hash = DocumentCacheService.generateHash(buffer);
     expect(hash).toBe("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
   });
+
+  it("safely resolves L1 cache hits without Firestore access", async () => {
+    const service = DocumentCacheService.getInstance();
+    const fakeAnalysis = { overallRiskScore: 42, summary: "L1 test", clauses: [], scenarios: [] };
+    // Inject fake analysis into the private L1 cache
+    (service as any).l1Cache.set("fake-hash", fakeAnalysis);
+    
+    // checkCache should hit L1 and return instantly without triggering Firestore getters
+    const result = await service.checkCache("fake-hash");
+    expect(result).toEqual(fakeAnalysis);
+  });
 });
 
 describe("PDF Parser Service Worker Thread", () => {

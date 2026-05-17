@@ -94,6 +94,7 @@ export function createApp(dependencies: AppDependencies) {
 
   app.get("/api/health", (req: RequestContextRequest, res) => {
     const readiness = dependencies.evaluateReadiness();
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     sendApiSuccess(res, {
       status: readiness.status,
       timestamp: new Date().toISOString(),
