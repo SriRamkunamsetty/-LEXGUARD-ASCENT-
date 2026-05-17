@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      # Pass through the API key from host environment for local compose testing
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    # Mount the env.production just in case there are additional non-secret configs,
+    # though technically baked in via Dockerfile is fine.
+    env_file:
+      - .env.production
