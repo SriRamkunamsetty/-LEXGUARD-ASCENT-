@@ -41,9 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#09090b] text-zinc-100">
+      <div className="flex h-screen items-center justify-center bg-[#09090b] text-zinc-100" aria-busy="true">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 rounded-full border-t-2 border-emerald-500 animate-spin"></div>
+          <div className="w-8 h-8 rounded-full border-t-2 border-emerald-500 animate-spin" role="status">
+            <span className="sr-only">Verifying identity</span>
+          </div>
           <p className="text-sm font-mono text-zinc-400">Verifying Identity...</p>
         </div>
       </div>
@@ -64,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               Sign In with Google Workspace
             </Button>
           </div>
-          <p className="text-[10px] text-zinc-600 font-monouppercase tracking-wider">
+          <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
             SECURE ZERO-TRUST AUTHENTICATION
           </p>
         </div>

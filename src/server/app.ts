@@ -1,7 +1,8 @@
 import express from "express";
 import multer from "multer";
 import type { Request, Response } from "express";
-import { applySecurityHeaders, attachRequestContext, type RequestContextRequest } from "./request-context";
+import { applyCorsHeaders, applySecurityHeaders, attachRequestContext, type RequestContextRequest } from "./request-context";
+import crypto from "node:crypto";
 import { createRateLimitMiddleware } from "./rate-limit";
 import { createUploadPolicy } from "./upload-policy";
 import { sendApiSuccess } from "./api-response";
@@ -77,8 +78,10 @@ export function createApp(dependencies: AppDependencies) {
   });
 
   app.disable("x-powered-by");
+  app.use(applyCorsHeaders);
   app.use(applySecurityHeaders);
   app.use(attachRequestContext);
+  app.use(express.json({ limit: "1mb" }));
   app.use(
     "/api/analyze",
     createRateLimitMiddleware({

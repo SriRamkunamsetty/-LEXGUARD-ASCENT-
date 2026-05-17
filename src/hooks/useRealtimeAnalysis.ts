@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { auth } from "../lib/firebase";
-import { AnalysisClientService } from "../src/services/client/analysis-client.service";
+import { auth } from "@/lib/firebase";
+import { AnalysisClientService } from "@/services/client/analysis-client.service";
 
 export type AnalysisStatus = "IDLE" | "UPLOADING" | "PROCESSING" | "COMPLETED" | "ERROR";
 
@@ -37,10 +37,10 @@ export function useContractAnalysis() {
           idToken,
         },
         {
-          onStatus: (event) => {
+          onStatus: (event: ProcessingStep & { requestId?: string }) => {
             setProgressLog((prev) => [...prev, event]);
           },
-          onComplete: (event) => {
+          onComplete: (event: { data: any; contractId?: string; requestId?: string }) => {
             setLatestAnalysis(event.data);
             setLatestContractId(event.contractId || null);
             setStatus("COMPLETED");
@@ -48,10 +48,10 @@ export function useContractAnalysis() {
           },
         },
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setStatus("ERROR");
-      setErrorMsg(err.message || "An unknown error occurred during analysis.");
+      setErrorMsg(err instanceof Error ? err.message : "An unknown error occurred during analysis.");
     }
   };
 

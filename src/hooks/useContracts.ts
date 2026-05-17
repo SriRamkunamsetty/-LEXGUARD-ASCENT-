@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
-import { db, auth } from "../lib/firebase";
-import { ContractRecord } from "../src/shared/contracts";
+import { db, auth } from "@/lib/firebase";
+import { ContractRecord } from "@/shared/contracts";
 
 export interface ContractData extends ContractRecord {}
 

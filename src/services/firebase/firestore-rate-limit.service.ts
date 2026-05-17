@@ -49,12 +49,14 @@ export class FirestoreRateLimitService implements RateLimitStore {
   }
 
   async consume(input: ConsumeInput) {
-    const docRef = this.collection.doc(input.key);
+    const db = this.db as any;
+    const collection = db.collection("rate_limits");
+    const docRef = collection.doc(input.key);
     const now = Date.now();
 
-    const result = await this.db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx: any) => {
       const snap = await tx.get(docRef);
-      const data = snap.data() as { count?: number; resetAt?: number } | undefined;
+      const data = snap.data?.() as { count?: number; resetAt?: number } | undefined;
       const resetAt = data?.resetAt ?? 0;
 
       if (!snap.exists || resetAt <= now) {

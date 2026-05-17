@@ -1,8 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
+import crypto from "node:crypto";
 import { ErrorManager } from "./error-manager";
 import { FirestoreRateLimitService, type RateLimitStore } from "../services/firebase/firestore-rate-limit.service";
 import { sendApiError } from "./api-response";
 import { ObservabilityManager } from "./observability-manager";
+
+function hashIdentity(raw: string): string {
+  return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 32);
+}
 
 export function createRateLimitMiddleware(options?: {
   limit?: number;
@@ -16,8 +21,9 @@ export function createRateLimitMiddleware(options?: {
   const store = options?.store ?? FirestoreRateLimitService.getInstance();
 
   return async (req: Request, res: Response, next: NextFunction) => {
-    const identity = req.headers.authorization?.toString() || req.ip || "anonymous";
-    const key = `${keyPrefix}:${identity}`;
+    const rawIdentity = req.ip || "anonymous";
+    const key = `${keyPrefix}:${hashIdentity(rawIdentity)}`;
+
 
     try {
       const result = await store.consume({

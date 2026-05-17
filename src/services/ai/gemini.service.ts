@@ -150,8 +150,8 @@ export class GeminiService {
     }
   }
 
-  private normalizeError(error: any): Error {
-    const message = error?.message || "Unknown Gemini error";
+  private normalizeError(error: unknown): Error {
+    const message = error instanceof Error ? error.message : (error as any)?.message || "Unknown Gemini error";
 
     if (message.includes("reported as leaked")) {
       return new Error(

@@ -11,7 +11,7 @@ async function test() {
         const dummyPdf = Buffer.from("%PDF-1.4\nSome invalid pdf data...");
         await DocumentParserService.extractText(dummyPdf, "application/pdf");
     } catch(e) {
-        console.log("Caught expected error for invalid PDF:", e.message);
+        console.log("Caught expected error for invalid PDF:", e instanceof Error ? e.message : String(e));
     }
 
     console.log("Testing load of real package - no failure on function resolution");

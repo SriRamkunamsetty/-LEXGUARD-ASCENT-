@@ -2,6 +2,8 @@ import { AppError } from "../../server/error-manager";
 import { ObservabilityManager } from "../../server/observability-manager";
 import { ContractAnalysisService } from "./contract-analysis.service";
 import { FirestoreContractsService, type ContractsStore } from "../firebase/firestore-contracts.service";
+import { DocumentCacheService } from "../firebase/firestore-cache.service";
+import { ContractAnalysis } from "@/shared/contracts";
 
 type WorkflowInput = {
   requestId?: string;
@@ -30,10 +32,12 @@ export class AnalysisWorkflowService {
     dependencies?: {
       contractsStore?: ContractsStore;
       analyzeContract?: AnalyzeDependency;
+      documentCacheStore?: typeof DocumentCacheService.prototype;
     },
   ): Promise<WorkflowOutput> {
     const contractsStore = dependencies?.contractsStore ?? FirestoreContractsService.getInstance();
     const analyzeContract = dependencies?.analyzeContract ?? ContractAnalysisService.analyze;
+    const documentCacheStore = dependencies?.documentCacheStore ?? DocumentCacheService.getInstance();
     const timer = ObservabilityManager.startTimer("analysis.workflow", {
       requestId: input.requestId,
       userId: input.userId,
@@ -51,6 +55,29 @@ export class AnalysisWorkflowService {
         mimeType: input.file.mimetype,
       });
 
+      const fileHash = DocumentCacheService.generateHash(input.file.buffer);
+      const cachedAnalysis = await documentCacheStore.checkCache(fileHash);
+
+      if (cachedAnalysis) {
+        onProgress?.({ step: "INGESTION", message: "Cache hit: Document analysis retrieved from global cache." });
+        onProgress?.({ step: "FINALIZING", message: "Finalizing contract analysis record..." });
+        
+        await contractsStore.markCompleted(contractId, cachedAnalysis);
+        timer.done("success", {
+          contractId,
+          clauseCount: cachedAnalysis.clauses?.length,
+          riskScore: cachedAnalysis.overallRiskScore,
+          cacheHit: true,
+        });
+
+        return {
+          contractId,
+          parsedData: cachedAnalysis,
+          injectionSignals: [],
+          extractedTextLength: 0,
+        };
+      }
+
       const result = await analyzeContract(
         {
           buffer: input.file.buffer,
@@ -60,6 +87,7 @@ export class AnalysisWorkflowService {
         onProgress,
       );
 
+      await documentCacheStore.saveCache(fileHash, result.parsedData as ContractAnalysis);
       await contractsStore.markCompleted(contractId, result.parsedData);
       timer.done("success", {
         contractId,

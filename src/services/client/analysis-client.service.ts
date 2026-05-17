@@ -1,4 +1,4 @@
-import type { ProcessingStep } from "../../../hooks/useRealtimeAnalysis";
+import type { ProcessingStep } from "@/hooks/useRealtimeAnalysis";
 
 export type AnalysisStreamEvent =
   | { type: "status"; data: ProcessingStep & { requestId?: string } }

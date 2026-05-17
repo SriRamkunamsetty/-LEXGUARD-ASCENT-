@@ -45,3 +45,5 @@ export const contractRecordSchema = z.object({
 export type AnalysisStatus = z.infer<typeof analysisStatusSchema>;
 export type ContractAnalysis = z.infer<typeof contractAnalysisSchema>;
 export type ContractRecord = z.infer<typeof contractRecordSchema>;
+export type ClauseResult = z.infer<typeof clauseSchema>;
+export type ScenarioSimulation = z.infer<typeof scenarioSchema>;
