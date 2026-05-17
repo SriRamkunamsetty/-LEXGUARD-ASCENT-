@@ -11,6 +11,8 @@ import { parseServerSentEvents } from "../src/services/client/analysis-client.se
 import { formatSseEvent } from "../src/server/sse-manager";
 import { HealthService } from "../src/services/system/health.service";
 import { StartupVerificationService } from "../src/services/system/startup-verification.service";
+import { DocumentCacheService } from "../src/services/firebase/firestore-cache.service";
+import { PDFParserService } from "../src/services/document/pdf-parser.service";
 
 describe("Auth Utilities", () => {
   it("returns null for missing header", () => {
@@ -247,5 +249,20 @@ describe("Startup Verification", () => {
     });
     expect(report.ok).toBe(true);
     expect(report.warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Document Cache Service", () => {
+  it("generates correct SHA-256 hash for buffer", () => {
+    const buffer = Buffer.from("hello world");
+    const hash = DocumentCacheService.generateHash(buffer);
+    expect(hash).toBe("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+  });
+});
+
+describe("PDF Parser Service Worker Thread", () => {
+  it("rejects invalid PDF buffer formats safely via worker threads", async () => {
+    const buffer = Buffer.from("this is not a pdf file");
+    await expect(PDFParserService.parse(buffer)).rejects.toThrow();
   });
 });

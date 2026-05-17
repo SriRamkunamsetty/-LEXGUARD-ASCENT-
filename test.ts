@@ -1,1 +1,0 @@
-import * as pdfParseModule from "pdf-parse"; const _pdfParse = (pdfParseModule as any).default || pdfParseModule; console.log(typeof _pdfParse);
