@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local", override: true });
+dotenv.config({ override: true });
 import express from "express";
 import path from "path";
 import multer from "multer";
@@ -5,10 +8,33 @@ import { createServer as createViteServer } from "vite";
 import { Type, Schema } from "@google/genai";
 import { ExtractionService } from "./src/services/document/extraction.service";
 import { GeminiService } from "./src/services/ai/gemini.service";
+import { FirebaseAdminService } from "./src/services/firebase/firebase.admin.service";
+import { config } from "./src/config/env";
 
 // 1. Initialize Express and Middleware
+// --- SYSTEM STARTUP CHECKS ---
+console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+console.log("SYSTEM STARTUP CHECKS");
+console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+console.log("Gemini key exists:", !!process.env.GEMINI_API_KEY);
+console.log("Gemini key length:", process.env.GEMINI_API_KEY?.length);
+console.log("Gemini key type:", typeof process.env.GEMINI_API_KEY);
+if (process.env.GEMINI_API_KEY) {
+  console.log("Has leading/trailing whitespace:", process.env.GEMINI_API_KEY !== process.env.GEMINI_API_KEY.trim());
+  console.log("Has quotes:", process.env.GEMINI_API_KEY.startsWith('"') || process.env.GEMINI_API_KEY.startsWith("'"));
+}
+console.log("Model set to gemini-2.5-flash to avoid free-tier token exhaustion on pro.");
+console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = config.PORT;
+
+// Initialize critical backend services (Lazy or handled with try/catch inside getInstance)
+try {
+  FirebaseAdminService.getInstance();
+} catch (e) {
+  console.error("Critical Backend Service Initialization Failed:", e);
+}
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
 // Utility to send SSE events
@@ -55,7 +81,7 @@ app.post("/api/analyze", upload.single("document"), async (req, res) => {
     }
 
     if (!documentText || documentText.trim().length === 0) {
-      throw new Error("Could not extract any text from the document.");
+      throw new Error("Could not extract any text from the document. The document appears to be empty or unreadable.");
     }
 
     sendSSE(res, "status", { step: "AGENT_ORCHESTRATION", message: "Initiating multi-agent semantic analysis..." });
@@ -112,7 +138,7 @@ ${documentText.substring(0, 30000)} // Truncating safely if too massive
     const parsedData = await GeminiService.getInstance().generateContentStructured(
       prompt,
       responseSchema,
-      "gemini-2.5-pro",
+      "gemini-2.5-flash",
     );
     
     sendSSE(res, "status", { step: "FINALIZING", message: "Parsing analysis array..." });

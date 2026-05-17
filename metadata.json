@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Lexguard",
+  "description": "Multi-agent legal contract reasoning app",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

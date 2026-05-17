@@ -32,7 +32,7 @@ Store the Gemini API Key and other sensitive credentials natively in Google Secr
 gcloud secrets create gemini-api-key --replication-policy="automatic"
 
 # Add the secret version
-echo -n "AIzaSyBa3s5KOzCE2zlQgGP9tyyCtQ7geSziKWI" | gcloud secrets versions add gemini-api-key --data-file=-
+echo -n "AIzaSyARbbgR7aLDNrP8uIcljJM4sJE8JDmRGwI" | gcloud secrets versions add gemini-api-key --data-file=-
 ```
 
 ## 4. Setup Service Accounts (IAM Privilege Escalation Prevention)
