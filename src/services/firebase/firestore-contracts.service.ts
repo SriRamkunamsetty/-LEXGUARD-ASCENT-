@@ -9,8 +9,22 @@ type CreateContractRecordInput = {
   mimeType: string;
 };
 
-export class FirestoreContractsService {
+type ContractCollectionLike = {
+  add(data: Record<string, unknown>): Promise<{ id: string }>;
+  doc(id: string): {
+    set(data: Record<string, unknown>, options?: { merge?: boolean }): Promise<void>;
+  };
+};
+
+export interface ContractsStore {
+  createPendingRecord(input: CreateContractRecordInput): Promise<string>;
+  markCompleted(contractId: string, analysis: unknown): Promise<void>;
+  markErrored(contractId: string, errorMessage: string): Promise<void>;
+}
+
+export class FirestoreContractsService implements ContractsStore {
   private static instance: FirestoreContractsService;
+  constructor(private readonly contractsCollection?: ContractCollectionLike) {}
 
   public static getInstance() {
     if (!this.instance) {
@@ -21,7 +35,7 @@ export class FirestoreContractsService {
   }
 
   private get collection() {
-    return FirebaseAdminService.getInstance().getFirestore().collection("contracts");
+    return this.contractsCollection ?? FirebaseAdminService.getInstance().getFirestore().collection("contracts");
   }
 
   public async createPendingRecord(input: CreateContractRecordInput) {

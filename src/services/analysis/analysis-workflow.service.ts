@@ -1,7 +1,7 @@
 import { AppError } from "../../server/error-manager";
 import { ObservabilityManager } from "../../server/observability-manager";
 import { ContractAnalysisService } from "./contract-analysis.service";
-import { FirestoreContractsService } from "../firebase/firestore-contracts.service";
+import { FirestoreContractsService, type ContractsStore } from "../firebase/firestore-contracts.service";
 
 type WorkflowInput = {
   requestId?: string;
@@ -21,11 +21,19 @@ type WorkflowOutput = {
   extractedTextLength: number;
 };
 
+type AnalyzeDependency = typeof ContractAnalysisService.analyze;
+
 export class AnalysisWorkflowService {
   static async execute(
     input: WorkflowInput,
     onProgress?: (event: { step: "INGESTION" | "AGENT_ORCHESTRATION" | "AGENT_REASONING" | "FINALIZING"; message: string }) => void,
+    dependencies?: {
+      contractsStore?: ContractsStore;
+      analyzeContract?: AnalyzeDependency;
+    },
   ): Promise<WorkflowOutput> {
+    const contractsStore = dependencies?.contractsStore ?? FirestoreContractsService.getInstance();
+    const analyzeContract = dependencies?.analyzeContract ?? ContractAnalysisService.analyze;
     const timer = ObservabilityManager.startTimer("analysis.workflow", {
       requestId: input.requestId,
       userId: input.userId,
@@ -36,14 +44,14 @@ export class AnalysisWorkflowService {
     let contractId: string | null = null;
 
     try {
-      contractId = await FirestoreContractsService.getInstance().createPendingRecord({
+      contractId = await contractsStore.createPendingRecord({
         userId: input.userId,
         originalName: input.file.originalname,
         fileSize: input.file.size,
         mimeType: input.file.mimetype,
       });
 
-      const result = await ContractAnalysisService.analyze(
+      const result = await analyzeContract(
         {
           buffer: input.file.buffer,
           mimeType: input.file.mimetype,
@@ -52,7 +60,7 @@ export class AnalysisWorkflowService {
         onProgress,
       );
 
-      await FirestoreContractsService.getInstance().markCompleted(contractId, result.parsedData);
+      await contractsStore.markCompleted(contractId, result.parsedData);
       timer.done("success", {
         contractId,
         clauseCount: (result.parsedData as any)?.clauses?.length,
@@ -65,7 +73,7 @@ export class AnalysisWorkflowService {
       };
     } catch (error) {
       if (contractId) {
-        await FirestoreContractsService.getInstance().markErrored(
+        await contractsStore.markErrored(
           contractId,
           error instanceof Error ? error.message : "Failed to process document",
         );

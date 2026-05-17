@@ -7,8 +7,30 @@ type ConsumeInput = {
   windowMs: number;
 };
 
-export class FirestoreRateLimitService {
+type TransactionLike = {
+  get(
+    ref: { id: string },
+  ): Promise<{
+    exists: boolean;
+    data(): { count?: number; resetAt?: number } | undefined;
+  }>;
+  set(ref: { id: string }, data: Record<string, unknown>, options?: { merge?: boolean }): void;
+};
+
+type FirestoreLike = {
+  collection(name: string): {
+    doc(id: string): { id: string };
+  };
+  runTransaction<T>(updateFn: (tx: TransactionLike) => Promise<T>): Promise<T>;
+};
+
+export interface RateLimitStore {
+  consume(input: ConsumeInput): Promise<{ allowed: boolean; remaining: number }>;
+}
+
+export class FirestoreRateLimitService implements RateLimitStore {
   private static instance: FirestoreRateLimitService;
+  constructor(private readonly firestore?: FirestoreLike) {}
 
   static getInstance() {
     if (!this.instance) {
@@ -18,15 +40,19 @@ export class FirestoreRateLimitService {
     return this.instance;
   }
 
+  private get db() {
+    return this.firestore ?? FirebaseAdminService.getInstance().getFirestore();
+  }
+
   private get collection() {
-    return FirebaseAdminService.getInstance().getFirestore().collection("rate_limits");
+    return this.db.collection("rate_limits");
   }
 
   async consume(input: ConsumeInput) {
     const docRef = this.collection.doc(input.key);
     const now = Date.now();
 
-    const result = await FirebaseAdminService.getInstance().getFirestore().runTransaction(async (tx) => {
+    const result = await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(docRef);
       const data = snap.data() as { count?: number; resetAt?: number } | undefined;
       const resetAt = data?.resetAt ?? 0;

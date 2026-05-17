@@ -25,6 +25,7 @@ export class FirebaseAdminService {
       const projectId = config.FIREBASE_PROJECT_ID || config.GOOGLE_CLOUD_PROJECT;
       const clientEmail = config.FIREBASE_CLIENT_EMAIL;
       const privateKey = config.parsedFirebasePrivateKey;
+      const isUsingEmulator = !!process.env.FIRESTORE_EMULATOR_HOST || !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
       if (projectId && clientEmail && privateKey) {
         admin.initializeApp({
@@ -47,6 +48,15 @@ export class FirebaseAdminService {
         });
 
         console.log("[FirebaseAdminService] Firebase Admin SDK initialized with application default credentials.");
+        return;
+      }
+
+      if (isUsingEmulator) {
+        admin.initializeApp({
+          projectId: projectId || "lexguard-local-emulator",
+        });
+
+        console.log("[FirebaseAdminService] Firebase Admin SDK initialized for emulator mode.");
         return;
       }
 

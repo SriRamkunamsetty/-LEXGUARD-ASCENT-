@@ -11,6 +11,8 @@ import { extractBearerToken } from "./auth.utils";
 import type { VerifyIdTokenFn } from "./auth.types";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { HealthService, type ReadinessReport } from "../services/system/health.service";
+import type { RateLimitStore } from "../services/firebase/firestore-rate-limit.service";
+import { AppError, ErrorManager } from "./error-manager";
 
 export interface AuthenticatedRequest extends Request, RequestContextRequest {
   user?: DecodedIdToken;
@@ -31,6 +33,7 @@ type ProgressEvent = {
 export type AppDependencies = {
   verifyIdToken: VerifyIdTokenFn;
   evaluateReadiness: () => ReadinessReport;
+  rateLimitStore?: RateLimitStore;
   runAnalysisWorkflow: (
     input: {
       requestId?: string;
@@ -76,7 +79,15 @@ export function createApp(dependencies: AppDependencies) {
   app.disable("x-powered-by");
   app.use(applySecurityHeaders);
   app.use(attachRequestContext);
-  app.use("/api/analyze", createRateLimitMiddleware({ limit: 6, windowMs: 60_000, keyPrefix: "analyze" }));
+  app.use(
+    "/api/analyze",
+    createRateLimitMiddleware({
+      limit: 6,
+      windowMs: 60_000,
+      keyPrefix: "analyze",
+      store: dependencies.rateLimitStore,
+    }),
+  );
 
   app.get("/api/health", (req: RequestContextRequest, res) => {
     const readiness = dependencies.evaluateReadiness();
@@ -175,6 +186,29 @@ export function createApp(dependencies: AppDependencies) {
       }
     },
   );
+
+  app.use((error: unknown, req: RequestContextRequest, res: Response, next: express.NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+
+    let normalizedError = ErrorManager.fromUnknown(error, "Request processing failed.");
+
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      normalizedError = new AppError("Uploaded file exceeds the 10 MB limit.", "UPLOAD_TOO_LARGE", 413);
+    } else if (error instanceof Error && error.message.includes("Unsupported file type")) {
+      normalizedError = new AppError(error.message, "UNSUPPORTED_FILE_TYPE", 415);
+    }
+
+    ObservabilityManager.logError("http.request_failed", {
+      requestId: req.requestId,
+      status: normalizedError.status,
+      code: normalizedError.code,
+      message: normalizedError.message,
+    });
+    ErrorManager.respond(res, normalizedError);
+  });
 
   return app;
 }

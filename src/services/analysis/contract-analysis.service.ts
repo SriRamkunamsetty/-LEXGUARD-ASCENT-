@@ -1,8 +1,9 @@
 import { ExtractionService } from "../document/extraction.service";
 import { GeminiService } from "../ai/gemini.service";
-import { contractAnalysisSchema } from "./analysis.schema";
+import { contractAnalysisSchema as contractAnalysisResponseSchema } from "./analysis.schema";
 import { buildContractAnalysisPrompt, detectPromptInjectionSignals } from "./prompt-guard.service";
 import { ValidationManager } from "../../server/validation-manager";
+import { contractAnalysisSchema } from "../../shared/contracts";
 
 export type AnalysisProgressEvent = {
   step: "INGESTION" | "AGENT_ORCHESTRATION" | "AGENT_REASONING" | "FINALIZING";
@@ -51,7 +52,7 @@ export class ContractAnalysisService {
     const injectionSignals = detectPromptInjectionSignals(extractedText);
     const parsedData = await GeminiService.getInstance().generateContentStructured(
       prompt,
-      contractAnalysisSchema,
+      contractAnalysisResponseSchema,
       "gemini-2.5-flash",
     );
 

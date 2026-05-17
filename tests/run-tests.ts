@@ -122,6 +122,32 @@ async function main() {
     assert.match(report.errors[0] || "", /GEMINI_API_KEY/);
   });
 
+  await run("StartupVerificationService passes for local API key mode", () => {
+    const report = StartupVerificationService.verify({
+      useVertexAI: false,
+      hasGeminiApiKey: true,
+      firebaseProjectId: "demo-project",
+      googleCloudProject: "",
+      port: 3000,
+    });
+
+    assert.equal(report.ok, true);
+    assert.equal(report.errors.length, 0);
+  });
+
+  await run("StartupVerificationService passes for Vertex AI mode with project", () => {
+    const report = StartupVerificationService.verify({
+      useVertexAI: true,
+      hasGeminiApiKey: false,
+      firebaseProjectId: "demo-project",
+      googleCloudProject: "sita-486706",
+      port: 3000,
+    });
+
+    assert.equal(report.ok, true);
+    assert.equal(report.errors.length, 0);
+  });
+
   console.log("All local assertions passed.");
 }
 

@@ -11,7 +11,12 @@ export class GeminiService {
   private backendMode: "apiKey" | "vertex";
 
   private constructor() {
-    const backend = resolveGeminiBackend(config);
+    const backend = resolveGeminiBackend({
+      GEMINI_API_KEY: config.GEMINI_API_KEY,
+      GOOGLE_CLOUD_LOCATION: config.GOOGLE_CLOUD_LOCATION,
+      GOOGLE_CLOUD_PROJECT: config.GOOGLE_CLOUD_PROJECT,
+      GOOGLE_GENAI_USE_VERTEXAI: config.GOOGLE_GENAI_USE_VERTEXAI,
+    });
     this.backendMode = backend.mode;
 
     this.client =

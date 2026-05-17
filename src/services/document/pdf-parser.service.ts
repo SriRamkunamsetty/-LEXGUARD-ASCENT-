@@ -1,7 +1,3 @@
-import { createRequire } from "module";
-
-const requireNode = createRequire(import.meta.url);
-
 export interface PDFParseResult {
   text: string;
   numpages: number;
@@ -16,11 +12,12 @@ export interface PDFParseResult {
 export class PDFParserService {
   static async parse(buffer: Buffer): Promise<PDFParseResult> {
     try {
-      // Isolate Native CommonJS module loading safely.
-      const pdfParse = requireNode("pdf-parse");
-      
-      const parseFunc = typeof pdfParse === "function" ? pdfParse : pdfParse.default || pdfParse;
-      
+      const pdfParseModule = await import("pdf-parse");
+      const parseFunc =
+        typeof pdfParseModule === "function"
+          ? pdfParseModule
+          : pdfParseModule.default || pdfParseModule;
+
       if (typeof parseFunc !== "function") {
         throw new Error(`Resolved pdf-parse is not a function: ${typeof parseFunc}`);
       }
