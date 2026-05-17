@@ -1,29 +1,35 @@
-import { GoogleGenAI, Type, Schema, GenerateContentParameters } from "@google/genai";
+import { GoogleGenAI, Schema } from "@google/genai";
 import { config } from "../../config/env";
+import { resolveGeminiBackend } from "./gemini.config";
+import { RetryManager } from "../../server/retry-manager";
+import { ObservabilityManager } from "../../server/observability-manager";
+import { AppError } from "../../server/error-manager";
 
 export class GeminiService {
   private static instance: GeminiService;
   private client: GoogleGenAI;
+  private backendMode: "apiKey" | "vertex";
 
   private constructor() {
-    const apiKey = config.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("CRITICAL: GEMINI_API_KEY environment variable is missing.");
-    }
-    
-    console.log(`[GeminiService] Initializing with key starting with: ${apiKey.substring(0, 10)}... (length: ${apiKey.length})`);
-    
-    // Initialize the client strictly securely
-    this.client = new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'lexguard-production',
-        }
-      }
-    });
+    const backend = resolveGeminiBackend(config);
+    this.backendMode = backend.mode;
 
-    console.log("[GeminiService] ✅ Initialized securely.");
+    this.client =
+      backend.mode === "vertex"
+        ? new GoogleGenAI({
+            vertexai: true,
+            project: backend.project,
+            location: backend.location,
+          })
+        : new GoogleGenAI({
+            apiKey: backend.apiKey,
+          });
+
+    console.log(
+      `[GeminiService] Initialized using ${
+        this.backendMode === "vertex" ? "Vertex AI" : "Gemini Developer API"
+      } mode.`,
+    );
   }
 
   public static getInstance(): GeminiService {
@@ -33,86 +39,125 @@ export class GeminiService {
     return GeminiService.instance;
   }
 
-  /**
-   * Centralized wrapper for generating content
-   * Includes structured logging and basic validation
-   */
-  public async generateContentStructured(prompt: string, schema: Schema, model: string = "gemini-2.5-flash", retries = 2) {
-    let attempt = 0;
-    while (attempt <= retries) {
-      try {
-        console.log(`[GeminiService] generateContentStructured - Model: ${model}, Attempt: ${attempt + 1}/${retries + 1}`);
-        const response = await this.client.models.generateContent({
-          model: model,
-          contents: prompt,
-          config: {
-             // System instructions should be parameterized better in a real setup, but here it's fine for hackathon
-            systemInstruction: "You are a legal AI capable of precise reasoning and JSON output. Adhere strictly to the requested schema.",
-            temperature: 0.1,
-            responseMimeType: "application/json",
-            responseSchema: schema,
+  public async generateContentStructured(
+    prompt: string,
+    schema: Schema,
+    model: string = "gemini-2.5-flash",
+    retries = 2,
+  ) {
+    const timer = ObservabilityManager.startTimer("gemini.generate_structured", {
+      model,
+      backendMode: this.backendMode,
+    });
+
+    try {
+      const result = await RetryManager.execute(
+        async () => {
+          const response = await this.client.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              systemInstruction:
+                "You are a legal AI capable of precise reasoning and JSON output. Adhere strictly to the requested schema.",
+              temperature: 0.1,
+              responseMimeType: "application/json",
+              responseSchema: schema,
+            },
+          });
+
+          if (!response.text) {
+            throw new AppError("AI returned empty output text.", "AI_EMPTY_OUTPUT", 502);
           }
-        });
 
-        if (!response.text) {
-          throw new Error("AI returned empty output text.");
-        }
-
-        // Validate JSON
-        const parsed = JSON.parse(response.text);
-        console.log("[GeminiService] generateContentStructured - Success");
-        return parsed;
-        
-      } catch (error: any) {
-        console.error(`[GeminiService] ❌ Error on attempt ${attempt + 1}:`, error.message || error);
-        attempt++;
-        if (attempt > retries) {
-          throw new Error(`[GeminiService] Failed after ${retries + 1} attempts: ${error.message || "Unknown error"}`);
-        }
-        // Small exponential backoff
-        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-      }
+          return JSON.parse(response.text);
+        },
+        {
+          retries,
+          baseDelayMs: 1000,
+          factor: 2,
+          shouldRetry: (error) => {
+            const normalized = this.normalizeError(error);
+            return !normalized.message.includes("revoked as leaked");
+          },
+        },
+      );
+      timer.done("success");
+      return result;
+    } catch (error) {
+      const normalizedError = this.normalizeError(error);
+      timer.done("failure", { message: normalizedError.message });
+      throw new AppError(
+        `[GeminiService] Failed after ${retries + 1} attempts: ${normalizedError.message}`,
+        "AI_GENERATION_FAILED",
+        502,
+      );
     }
   }
 
-  /**
-   * Helper to extract raw text (OCR) from a document or image using Gemini
-   */
   public async extractTextFromImagePrompt(fileBuffer: Buffer, mimeType: string, retries = 1): Promise<string> {
-    let attempt = 0;
     const base64Data = fileBuffer.toString("base64");
-    
-    while (attempt <= retries) {
-      try {
-        console.log(`[GeminiService] extractTextFromImagePrompt - Attempt: ${attempt + 1}/${retries + 1}`);
-        const response = await this.client.models.generateContent({
-          model: "gemini-2.5-flash", // flash is fast and cheap for OCR
-          contents: [
-            { text: "Extract and return all the text from this document accurately. Do not add markdown formatting or conversational text, just the raw extracted text." },
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
-              }
-            }
-          ]
-        });
+    const timer = ObservabilityManager.startTimer("gemini.extract_text", {
+      mimeType,
+      backendMode: this.backendMode,
+    });
 
-        if (!response.text) {
-          throw new Error("AI returned empty extracted text.");
-        }
+    try {
+      const result = await RetryManager.execute(
+        async () => {
+          const response = await this.client.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              {
+                text: "Extract and return all the text from this document accurately. Do not add markdown formatting or conversational text, just the raw extracted text.",
+              },
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType,
+                },
+              },
+            ],
+          });
 
-        console.log("[GeminiService] extractTextFromImagePrompt - Success");
-        return response.text;
-      } catch (error: any) {
-        console.error(`[GeminiService] ❌ Error in extractTextFromImagePrompt (attempt ${attempt + 1}):`, error.message || error);
-        attempt++;
-        if (attempt > retries) {
-          throw new Error(`[GeminiService] OCR Failed after ${retries + 1} attempts: ${error.message || "Unknown error"}`);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
-      }
+          if (!response.text) {
+            throw new AppError("AI returned empty extracted text.", "AI_EMPTY_OCR_OUTPUT", 502);
+          }
+
+          return response.text;
+        },
+        {
+          retries,
+          baseDelayMs: 1000,
+          factor: 2,
+          shouldRetry: (error) => !this.normalizeError(error).message.includes("revoked as leaked"),
+        },
+      );
+      timer.done("success");
+      return result;
+    } catch (error) {
+      const normalizedError = this.normalizeError(error);
+      timer.done("failure", { message: normalizedError.message });
+      throw new AppError(
+        `[GeminiService] OCR failed after ${retries + 1} attempts: ${normalizedError.message}`,
+        "AI_OCR_FAILED",
+        502,
+      );
     }
-    return "";
+  }
+
+  private normalizeError(error: any): Error {
+    const message = error?.message || "Unknown Gemini error";
+
+    if (message.includes("reported as leaked")) {
+      return new Error(
+        "Gemini API key has been revoked as leaked. Rotate the key immediately or use Vertex AI on Cloud Run with ADC and Secret Manager.",
+      );
+    }
+
+    if (message.includes("PERMISSION_DENIED")) {
+      return new Error("Gemini authorization failed. Verify the runtime credential mode and IAM bindings.");
+    }
+
+    return error instanceof Error ? error : new Error(message);
   }
 }

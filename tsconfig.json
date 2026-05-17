@@ -22,6 +22,9 @@
     },
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   }
 }

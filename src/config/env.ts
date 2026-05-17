@@ -3,9 +3,13 @@ import { z } from "zod";
 // Define the schema for our backend environment variables
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.string().transform(Number).default("3000"),
-  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is missing."),
+  PORT: z.coerce.number().int().positive().default(3000),
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GOOGLE_CLOUD_PROJECT: z.string().trim().optional(),
+  GOOGLE_CLOUD_LOCATION: z.string().trim().default("global"),
+  GOOGLE_GENAI_USE_VERTEXAI: z.enum(["true", "false"]).optional(),
   FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_DATABASE_ID: z.string().optional(),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
 });
@@ -36,6 +40,9 @@ try {
 
 export const config = {
   ...env,
+  get useVertexAI() {
+    return env.GOOGLE_GENAI_USE_VERTEXAI === "true" || !!env.GOOGLE_CLOUD_PROJECT;
+  },
   // Helper to safely parse private keys
   get parsedFirebasePrivateKey() {
     if (!env.FIREBASE_PRIVATE_KEY) return undefined;

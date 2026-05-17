@@ -16,7 +16,7 @@ export default function App() {
   
   const { user, logout } = useAuth();
   const { contracts, loading: contractsLoading } = useContracts();
-  const { analyzeContract, status, progressLog, errorMsg, reset } = useContractAnalysis();
+  const { analyzeContract, status, progressLog, errorMsg, latestAnalysis, reset } = useContractAnalysis();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,9 +37,13 @@ export default function App() {
   const pendingCount = contracts.filter(c => c.status === "processing").length;
   const processedCount = contracts.filter(c => c.status === "completed").length;
   const criticalCount = contracts.filter(c => c.analysis?.overallRiskScore > 75).length;
+  const displayedAnalysis = selectedContract?.analysis || latestAnalysis;
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#09090b] text-zinc-100 font-sans overflow-hidden border border-zinc-800">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-black">
+        Skip to main content
+      </a>
       {/* Global Enterprise Header */}
       <header className="h-16 border-b border-zinc-800 bg-zinc-950/50 flex flex-row items-center justify-between px-6 shrink-0">
         <div className="flex items-center gap-8">
@@ -47,13 +51,15 @@ export default function App() {
             <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-lg text-white">L</div>
             <span className="text-xl font-semibold tracking-tight text-white">LEX<span className="text-blue-500 font-normal">GUARD</span></span>
           </div>
-          <nav className="hidden md:flex gap-6 text-sm font-medium text-zinc-400">
+          <nav aria-label="Primary navigation" className="hidden md:flex gap-6 text-sm font-medium text-zinc-400">
             <button 
               onClick={() => { setActiveTab("dashboard"); setSelectedContract(null); reset(); }} 
+              aria-pressed={activeTab === "dashboard"}
               className={`h-16 flex items-center transition-colors ${activeTab === "dashboard" ? "text-white border-b-2 border-blue-500" : "hover:text-zinc-200"}`}
             >Intelligence Dashboard</button>
             <button 
               onClick={() => setActiveTab("analysis")} 
+              aria-pressed={activeTab === "analysis"}
               className={`h-16 flex items-center transition-colors ${activeTab === "analysis" ? "text-white border-b-2 border-blue-500" : "hover:text-zinc-200"}`}
             >Active Analysis</button>
           </nav>
@@ -66,16 +72,16 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400 hidden sm:inline-block">{user?.email}</span>
-            <button className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-white" title="Sign out" onClick={logout}>
+            <button className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-white" aria-label="Sign out" title="Sign out" onClick={logout}>
               {user?.email?.charAt(0).toUpperCase()}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex flex-1 overflow-hidden">
+      <main id="main-content" className="flex flex-1 overflow-hidden">
         {/* Side Navigation / Secondary Context */}
-        <aside className="w-72 border-r border-zinc-800 bg-zinc-950/30 hidden md:flex flex-col p-4 shrink-0 overflow-y-auto custom-scrollbar">
+        <aside aria-label="Analysis history" className="w-72 border-r border-zinc-800 bg-zinc-950/30 hidden md:flex flex-col p-4 shrink-0 overflow-y-auto custom-scrollbar">
           <div className="mb-8">
             <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-4">System Overview</p>
             <div className="space-y-4">
@@ -95,10 +101,10 @@ export default function App() {
               <p className="text-xs text-zinc-600 text-center py-4">No documents analyzed yet.</p>
             )}
             {contracts.map(c => (
-              <div 
+              <button
                 key={c.id} 
                 onClick={() => handleContractClick(c)}
-                className={`p-3 rounded-lg cursor-pointer border transition-all ${selectedContract?.id === c.id ? "bg-zinc-800 border-zinc-700" : "bg-transparent border-transparent hover:bg-zinc-900/50 hover:border-zinc-800"}`}
+                className={`w-full text-left p-3 rounded-lg cursor-pointer border transition-all ${selectedContract?.id === c.id ? "bg-zinc-800 border-zinc-700" : "bg-transparent border-transparent hover:bg-zinc-900/50 hover:border-zinc-800"}`}
               >
                 <p className="text-sm font-medium truncate text-zinc-200">{c.originalName}</p>
                 <div className="flex justify-between items-center mt-1.5">
@@ -108,7 +114,7 @@ export default function App() {
                   </span>
                   {c.analysis && <span className={`text-[10px] font-bold ${c.analysis.overallRiskScore > 60 ? 'text-red-400' : 'text-emerald-400'}`}>RISK {c.analysis.overallRiskScore}</span>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
     
@@ -141,7 +147,7 @@ export default function App() {
                       <p className="text-sm text-zinc-400">Upload a legal document (PDF, TXT) to initiate semantic multi-agent risk assessment.</p>
                     </div>
                     <div>
-                      <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.txt,.md" />
+                      <input aria-label="Upload legal document" type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp" />
                       <Button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/10">
                         <Upload className="h-4 w-4 mr-2" />
                         Analyze Document
@@ -183,7 +189,7 @@ export default function App() {
                      <h3 className="text-lg font-medium text-white mb-2">Orchestrating AI Agents</h3>
                      <p className="text-sm text-zinc-400">Streaming evaluation metrics from Gemini backend...</p>
                    </div>
-                   <div className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-left space-y-2 mt-4 max-h-48 overflow-y-auto text-xs font-mono">
+                   <div aria-live="polite" aria-atomic="false" className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-left space-y-2 mt-4 max-h-48 overflow-y-auto text-xs font-mono">
                      {progressLog.map((log, idx) => (
                        <div key={idx} className="flex gap-3 text-zinc-300">
                          <span className="text-emerald-500">[{log.step}]</span>
@@ -192,7 +198,7 @@ export default function App() {
                      ))}
                    </div>
                    {errorMsg && (
-                      <div className="w-full p-3 bg-red-950/30 border border-red-900/50 rounded-lg text-red-400 text-sm">
+                      <div role="alert" className="w-full p-3 bg-red-950/30 border border-red-900/50 rounded-lg text-red-400 text-sm">
                         {errorMsg}
                         <Button variant="outline" className="mt-2 w-full border-red-900 hover:bg-red-900/20" onClick={reset}>Try Again</Button>
                       </div>
@@ -211,13 +217,13 @@ export default function App() {
                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Overall Assessment</p>
                         <div className="flex gap-4 items-center">
                           <div className={`w-20 h-20 rounded-full border-4 flex items-center justify-center
-                            ${(selectedContract?.analysis?.overallRiskScore || 0) > 70 ? 'border-red-500/20 text-red-500' : 'border-emerald-500/20 text-emerald-500'}
+                            ${(displayedAnalysis?.overallRiskScore || 0) > 70 ? 'border-red-500/20 text-red-500' : 'border-emerald-500/20 text-emerald-500'}
                           `}>
-                            <span className="text-3xl font-bold">{selectedContract?.analysis?.overallRiskScore || 0}</span>
+                            <span className="text-3xl font-bold">{displayedAnalysis?.overallRiskScore || 0}</span>
                           </div>
                           <div className="flex-1">
                             <p className="text-sm leading-relaxed text-zinc-300">
-                              {selectedContract?.analysis?.summary || "No summary available."}
+                              {displayedAnalysis?.summary || "No summary available."}
                             </p>
                           </div>
                         </div>
@@ -226,7 +232,7 @@ export default function App() {
 
                     <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-2 ml-1">Simulated Scenarios</h3>
                     <div className="space-y-3">
-                      {selectedContract?.analysis?.scenarios?.map((scen: any, i: number) => (
+                      {displayedAnalysis?.scenarios?.map((scen: any, i: number) => (
                         <div key={i} className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors">
                            <div className="flex justify-between items-start mb-2">
                              <h4 className="text-sm font-medium text-white">{scen.title}</h4>
@@ -250,14 +256,14 @@ export default function App() {
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 ml-1">Flagged Clauses & Recommendations</h3>
                     <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                      {selectedContract?.analysis?.clauses?.length === 0 && (
+                      {displayedAnalysis?.clauses?.length === 0 && (
                         <div className="text-center p-12 bg-zinc-900/30 border border-dashed border-zinc-800 rounded-xl">
                           <CheckCircle2 className="w-12 h-12 text-emerald-500/50 mx-auto mb-4" />
                           <p className="text-zinc-400 text-sm">No critical risk clauses detected.</p>
                         </div>
                       )}
                       
-                      {selectedContract?.analysis?.clauses?.map((c: any, i: number) => (
+                      {displayedAnalysis?.clauses?.map((c: any, i: number) => (
                         <div key={i} className={`p-5 border rounded-xl bg-zinc-900/20 backdrop-blur-sm
                           ${c.category === 'HARMFUL' ? 'border-red-900/40 hover:border-red-500/40' :
                             c.category === 'AMBIGUOUS' ? 'border-amber-900/40 hover:border-amber-500/40' :

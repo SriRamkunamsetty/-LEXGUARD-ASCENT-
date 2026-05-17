@@ -32,7 +32,20 @@ Store the Gemini API Key and other sensitive credentials natively in Google Secr
 gcloud secrets create gemini-api-key --replication-policy="automatic"
 
 # Add the secret version
-echo -n "AIzaSyARbbgR7aLDNrP8uIcljJM4sJE8JDmRGwI" | gcloud secrets versions add gemini-api-key --data-file=-
+printf "%s" "REDACTED_ROTATED_GEMINI_API_KEY" | gcloud secrets versions add gemini-api-key --data-file=-
+```
+
+For the final round deployment, prefer running Gemini through Vertex AI on Cloud Run with ADC instead of long-lived API keys:
+
+```bash
+gcloud run deploy lexguard-service \
+  --image us-central1-docker.pkg.dev/sita-486706/lexguard-repo/lexguard-api:latest \
+  --region us-central1 \
+  --service-account lexguard-run-sa@sita-486706.iam.gserviceaccount.com \
+  --set-env-vars NODE_ENV=production,GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=sita-486706,GOOGLE_CLOUD_LOCATION=global,FIREBASE_PROJECT_ID=sita-486706 \
+  --allow-unauthenticated \
+  --min-instances 1 \
+  --max-instances 10
 ```
 
 ## 4. Setup Service Accounts (IAM Privilege Escalation Prevention)
@@ -87,6 +100,6 @@ gcloud run deploy lexguard-service \
 ## 8. Summary of Architecture
 
 - **Code Quality**: Separated environment logic via `.env.local/dev/prod`.
-- **Security**: The Gemini key never touches the browser `(No NEXT_PUBLIC_)`. Secret Manager handles the injection right into memory at runtime seamlessly.
+- **Security**: The Gemini key never touches the browser. Production should prefer Vertex AI + ADC, with Secret Manager reserved for local or non-Vertex fallback secrets.
 - **Efficiency**: Multi-stage `Dockerfile` only runs Node.js natively in Production without heavy dev-dependencies.
 - **Problem Statement Alignment**: The deployment is perfectly architected for the strict constraints of the Hackathon Final Round (scalable, stateless container execution, robust dependency injection).

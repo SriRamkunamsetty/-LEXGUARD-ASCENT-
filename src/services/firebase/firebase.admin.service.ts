@@ -1,5 +1,6 @@
-import * as admin from 'firebase-admin';
-import { config } from '../../config/env';
+import * as admin from "firebase-admin";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
+import { config } from "../../config/env";
 
 export class FirebaseAdminService {
   private static instance: FirebaseAdminService;
@@ -21,38 +22,55 @@ export class FirebaseAdminService {
     }
 
     try {
-      const projectId = config.FIREBASE_PROJECT_ID;
+      const projectId = config.FIREBASE_PROJECT_ID || config.GOOGLE_CLOUD_PROJECT;
       const clientEmail = config.FIREBASE_CLIENT_EMAIL;
       const privateKey = config.parsedFirebasePrivateKey;
 
-      if (!projectId || !clientEmail || !privateKey) {
-        console.warn("[FirebaseAdminService] ⚠️ Missing required Firebase environment variables. Admin SDK initialization skipped.");
+      if (projectId && clientEmail && privateKey) {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+          projectId,
+        });
+
+        console.log("[FirebaseAdminService] Firebase Admin SDK initialized with explicit service-account credentials.");
         return;
       }
 
-      admin.initializeApp({
-        credential: admin.credential.cert({
+      if (projectId) {
+        admin.initializeApp({
+          credential: admin.credential.applicationDefault(),
           projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
+        });
 
-      console.log("[FirebaseAdminService] ✅ Firebase Admin SDK initialized successfully.");
+        console.log("[FirebaseAdminService] Firebase Admin SDK initialized with application default credentials.");
+        return;
+      }
+
+      console.warn("[FirebaseAdminService] Missing Firebase project configuration. Admin SDK initialization skipped.");
     } catch (error: any) {
-      console.error("[FirebaseAdminService] ❌ Failed to initialize:", error.message || error);
+      console.error("[FirebaseAdminService] Failed to initialize:", error.message || error);
     }
   }
 
   public getFirestore() {
     this.ensureInitialized();
-    return admin.firestore();
+    return config.FIREBASE_DATABASE_ID
+      ? getAdminFirestore(admin.app(), config.FIREBASE_DATABASE_ID)
+      : admin.firestore();
+  }
+
+  public async verifyIdToken(token: string) {
+    this.ensureInitialized();
+    return admin.auth().verifyIdToken(token);
   }
 
   private ensureInitialized() {
     if (admin.apps.length === 0) {
-       console.warn("[FirebaseAdminService] Attempting to use Firebase Admin before successful initialization.");
+      throw new Error("Firebase Admin SDK is not initialized for backend authentication.");
     }
   }
 }
-

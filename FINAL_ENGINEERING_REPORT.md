@@ -15,7 +15,7 @@ The Lexguard system architecture has successfully achieved a production-ready ba
 *   **Streaming Architecture:** Server-Sent Events (SSE) pipeline is successfully streaming orchestration events from the backend to the React UI in real-time.
 *   **Upload Pipeline:** `multer`-based memory storage successfully receives PDF documents.
 *   **AI Service Architecture:** The `GeminiService` class is properly implementing the Singleton pattern, successfully wrapping the `@google/genai` SDK, and utilizing proper system environment variables.
-*   **Environment Validation:** Verified that `process.env.GEMINI_API_KEY` is successfully injected at runtime with a length of `39` characters and without string padding/formatting errors.
+*   **Environment Validation:** Verified that runtime environment injection is functioning, but the repository currently contains secret exposure anti-patterns that must be removed before production use.
 
 **The ONLY remaining blocker is at the Google Cloud API gateway layer:**
 `[GeminiService] Failed: {"error":{"code":403,"message":"Your API key was reported as leaked. Please use another API key.","status":"PERMISSION_DENIED"}}`
@@ -34,7 +34,7 @@ The failure is occurring at the **Google Cloud API Gateway** level, specifically
 ### Why This Happens
 Google Cloud infrastructure includes automated secret scanning mechanisms (like Google Cloud Secret Manager integrated with GitHub Secret Scanning). If a Gemini API key is ever committed to a public GitHub repository, posted on StackOverflow, or found in a public data breach, Google's automated systems instantly quarantine the key to protect the project's billing and security.
 
-**The runtime environment (`process.env.GEMINI_API_KEY`) is securely loading the key `AIzaSyCLxRRefAEICnzCY-0Kh9M4luwmJ8Ty79k` correctly.** However, this specific cryptographic key string has been flagged globally by Google as compromised. The API will refuse to process requests using this key, regardless of the application's architecture.
+**A Gemini API key previously used by the project has been flagged by Google as compromised.** The API will refuse to process requests using that key, regardless of the application's architecture.
 
 ### AI Studio & Runtime Environment Behavior
 *   The AI Studio Sandbox environment securely provisions the workspace and injects the API key associated with your Google AI Studio account into the Node.js runtime process (`process.env.GEMINI_API_KEY`).

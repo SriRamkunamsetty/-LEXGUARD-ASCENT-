@@ -6,6 +6,10 @@ export interface ParseResult {
 }
 
 export class DocumentParserService {
+  static isOcrEligibleMimeType(mimeType: string): boolean {
+    return ["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(mimeType);
+  }
+
   static async parsePDF(buffer: Buffer): Promise<ParseResult> {
     const rawData = await PDFParserService.parse(buffer);
     return {
@@ -22,6 +26,10 @@ export class DocumentParserService {
     // Fallback for raw text/markdown
     if (mimeType.startsWith("text/")) {
       return { text: fileBuffer.toString("utf-8") };
+    }
+
+    if (this.isOcrEligibleMimeType(mimeType)) {
+      return { text: "" };
     }
 
     throw new Error(`Unsupported file type: ${mimeType}`);

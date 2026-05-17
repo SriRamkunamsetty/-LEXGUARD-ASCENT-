@@ -12,7 +12,7 @@ services:
       - PORT=8080
       # Pass through the API key from host environment for local compose testing
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-    # Mount the env.production just in case there are additional non-secret configs,
-    # though technically baked in via Dockerfile is fine.
-    env_file:
-      - .env.production
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION}

@@ -1,14 +1,9 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { ContractRecord } from "../src/shared/contracts";
 
-export interface ContractData {
-  id: string;
-  originalName: string;
-  uploadDate: any;
-  status: "processing" | "completed" | "error";
-  analysis?: any;
-}
+export interface ContractData extends ContractRecord {}
 
 export function useContracts() {
   const [contracts, setContracts] = useState<ContractData[]>([]);
